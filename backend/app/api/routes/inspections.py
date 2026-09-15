@@ -23,7 +23,7 @@ from app.schemas.inspection import (
 from app.services import inspection_service
 from app.services.storage import get_storage_service
 
-router = APIRouter(prefix="/api/inspections", tags=["inspections"])
+router = APIRouter(prefix="/api/v1/inspections", tags=["inspections"])
 
 
 @router.post("", response_model=InspectionCreateResponse, status_code=201, summary="Create an inspection")

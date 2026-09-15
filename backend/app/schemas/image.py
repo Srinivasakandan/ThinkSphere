@@ -14,7 +14,7 @@ class ImageResponse(ORMModel):
     original_filename: str
     mime_type: str
     file_size: int
-    image_quality: ImageQuality | None
+    image_quality: ImageQuality
     quality_note: str | None
     processing_status: ImageProcessingStatus
     url: str

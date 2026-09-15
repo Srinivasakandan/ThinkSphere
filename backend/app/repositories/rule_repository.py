@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.rule import Rule
@@ -21,6 +21,36 @@ def list_active(db: Session, *, applicable_category: str | None = None) -> list[
 
 def list_all(db: Session) -> list[Rule]:
     return list(db.execute(select(Rule).order_by(Rule.rule_code)).scalars().all())
+
+
+def list_paginated(
+    db: Session,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    category: str | None = None,
+    active: bool | None = None,
+    search: str | None = None,
+) -> tuple[list[Rule], int]:
+    stmt = select(Rule)
+    if category:
+        stmt = stmt.where(Rule.category == category)
+    if active is not None:
+        stmt = stmt.where(Rule.active.is_(active))
+    if search:
+        like = f"%{search.lower()}%"
+        stmt = stmt.where(
+            func.lower(Rule.title).like(like)
+            | func.lower(Rule.rule_code).like(like)
+            | func.lower(Rule.description).like(like)
+        )
+
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+    total = db.execute(count_stmt).scalar_one()
+
+    stmt = stmt.order_by(Rule.rule_code).offset((page - 1) * page_size).limit(page_size)
+    items = list(db.execute(stmt).scalars().all())
+    return items, total
 
 
 def get(db: Session, rule_id: uuid.UUID) -> Rule | None:

@@ -12,11 +12,11 @@ from app.services import inspection_service
 from app.services.reports.report_service import generate_inspection_report
 from app.services.storage import get_storage_service
 
-router = APIRouter(prefix="/api/reports", tags=["reports"])
+router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 
 @router.post(
-    "/inspection/{inspection_id}",
+    "/inspections/{inspection_id}",
     response_model=ReportGenerateResponse,
     summary="Generate an inspection report",
 )

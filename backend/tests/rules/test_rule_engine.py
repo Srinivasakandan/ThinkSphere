@@ -87,7 +87,13 @@ class TestRequiredFieldEvaluator:
 
     def test_conflicting_value_marked_needs_review_is_needs_review(self):
         rule = make_rule("MRP")
-        field = make_field("MRP", "₹50", validation_status=ValidationStatus.NEEDS_REVIEW)
+        field = make_field("MRP", "₹50", validation_status=ValidationStatus.CONFLICT)
+        context = context_with(field)
+        assert evaluate_rule(rule, context).status == "NEEDS_REVIEW"
+
+    def test_uncertain_value_is_needs_review(self):
+        rule = make_rule("MRP")
+        field = make_field("MRP", "₹50", validation_status=ValidationStatus.UNCERTAIN)
         context = context_with(field)
         assert evaluate_rule(rule, context).status == "NEEDS_REVIEW"
 

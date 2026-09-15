@@ -16,21 +16,19 @@ from app.repositories import inspection_repository
 from app.services.storage import StorageService
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
-MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
-MAX_IMAGES_PER_INSPECTION = 10
 
 
 class ImageValidationError(ValueError):
     pass
 
 
-def _validate_image_bytes(content: bytes, mime_type: str, filename: str) -> None:
+def _validate_image_bytes(content: bytes, mime_type: str, filename: str, max_size_mb: int) -> None:
     if mime_type not in ALLOWED_MIME_TYPES:
         raise ImageValidationError(f"Unsupported file type '{mime_type}' for '{filename}'.")
     if len(content) == 0:
         raise ImageValidationError(f"'{filename}' is empty.")
-    if len(content) > MAX_FILE_SIZE_BYTES:
-        raise ImageValidationError(f"'{filename}' exceeds the maximum allowed size of 10MB.")
+    if len(content) > max_size_mb * 1024 * 1024:
+        raise ImageValidationError(f"'{filename}' exceeds the maximum allowed size of {max_size_mb}MB.")
 
     # Never trust the filename extension or declared MIME type alone —
     # confirm the bytes actually decode as an image.
@@ -49,6 +47,7 @@ async def upload_images(
     view_types: list[str],
     storage: StorageService,
     user_id: uuid.UUID,
+    settings: Settings,
 ) -> list[ProductImage]:
     if inspection.stage == InspectionStage.FINALIZED.value:
         raise HTTPException(
@@ -62,13 +61,15 @@ async def upload_images(
         )
 
     existing_count = len(inspection_repository.list_images(db, inspection.id))
-    if existing_count + len(files) > MAX_IMAGES_PER_INSPECTION:
+    if existing_count + len(files) > settings.max_images_per_inspection:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "error": {
                     "code": "TOO_MANY_IMAGES",
-                    "message": f"An inspection may have at most {MAX_IMAGES_PER_INSPECTION} images.",
+                    "message": (
+                        f"An inspection may have at most " f"{settings.max_images_per_inspection} images."
+                    ),
                 }
             },
         )
@@ -78,7 +79,7 @@ async def upload_images(
         content = await file.read()
         mime_type = file.content_type or "application/octet-stream"
         try:
-            _validate_image_bytes(content, mime_type, file.filename or "upload")
+            _validate_image_bytes(content, mime_type, file.filename or "upload", settings.max_image_size_mb)
         except ImageValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

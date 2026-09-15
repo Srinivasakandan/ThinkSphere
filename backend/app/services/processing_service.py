@@ -58,6 +58,12 @@ async def run_processing(
     storage,
     user_id: uuid.UUID,
 ) -> Inspection:
+    # Re-fetch under a row lock so two concurrent /process calls for the
+    # same inspection serialize rather than both starting the pipeline.
+    locked = inspection_repository.get_for_update(db, inspection.id)
+    if locked is not None:
+        inspection = locked
+
     if inspection.stage == InspectionStage.FINALIZED.value:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -172,6 +178,17 @@ async def run_processing(
                     "source_text": result.source_text,
                     "manually_verified": False,
                     "manually_edited": False,
+                    "candidates": (
+                        [
+                            {
+                                "value": c.value,
+                                "source_image_id": (str(c.source_image_id) if c.source_image_id else None),
+                            }
+                            for c in result.candidates
+                        ]
+                        if result.has_conflict
+                        else None
+                    ),
                 }
             )
         stored_fields = inspection_repository.add_extracted_fields(

@@ -22,7 +22,12 @@ isolation.
 from collections import defaultdict
 
 from app.services.extraction import nlp_extractor, regex_extractor
-from app.services.extraction.candidate import ExtractionCandidate, ExtractionResult, ImageOCRInput
+from app.services.extraction.candidate import (
+    ConflictCandidate,
+    ExtractionCandidate,
+    ExtractionResult,
+    ImageOCRInput,
+)
 from app.utils.confidence import combine_scores
 
 
@@ -60,9 +65,19 @@ def _resolve_field(
         )
 
     # Genuine conflict: different images disagree on this field's value.
-    # Never silently pick a winner — surface it for inspector review.
+    # Never silently pick a winner — surface every candidate with its
+    # source image for inspector review.
     best_overall = max(candidates, key=lambda c: c.confidence)
     distinct_values = sorted({c.value for c in candidates})
+    seen_values: set[str] = set()
+    candidate_list: list[ConflictCandidate] = []
+    for candidate in sorted(candidates, key=lambda c: c.confidence, reverse=True):
+        if candidate.value in seen_values:
+            continue
+        seen_values.add(candidate.value)
+        candidate_list.append(
+            ConflictCandidate(value=candidate.value, source_image_id=candidate.source_image_id)
+        )
     return ExtractionResult(
         field_name=field_name,
         value=best_overall.value,
@@ -72,6 +87,7 @@ def _resolve_field(
         source_text=best_overall.source_text,
         has_conflict=True,
         conflict_values=distinct_values,
+        candidates=candidate_list,
     )
 
 

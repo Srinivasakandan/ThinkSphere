@@ -8,6 +8,9 @@
 import type { Inspector } from "@/types";
 import { CURRENT_INSPECTOR } from "@/lib/mock/inspectors";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { apiGet, isApiConfigured } from "@/lib/api/client";
+import { mapInspector } from "@/lib/api/mappers";
+import type { ApiInspectorResponse } from "@/types/api";
 
 function delay<T>(value: T, ms = 400): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -25,6 +28,19 @@ export async function signIn(input: SignInInput): Promise<Inspector> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase!.auth.signInWithPassword(input);
     if (error) throw error;
+
+    // Backend is the source of truth for role/badge once it's provisioned
+    // the local inspector row — fall back to Supabase claims if it's
+    // unreachable so sign-in never hard-fails on a backend hiccup.
+    if (isApiConfigured()) {
+      try {
+        const profile = await apiGet<ApiInspectorResponse>("/api/v1/auth/me");
+        return mapInspector(profile);
+      } catch {
+        // fall through to the Supabase-only profile below
+      }
+    }
+
     return {
       id: data.user?.id ?? CURRENT_INSPECTOR.id,
       name: data.user?.user_metadata?.full_name ?? input.email,

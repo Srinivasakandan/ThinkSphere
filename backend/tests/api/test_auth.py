@@ -6,7 +6,7 @@ from app.main import app
 
 
 def test_mock_mode_allows_requests_without_a_token(client):
-    response = client.get("/api/auth/me")
+    response = client.get("/api/v1/auth/me")
     assert response.status_code == 200
     body = response.json()
     assert body["email"] == "demo.inspector@legalmetrology.gov.in"
@@ -22,7 +22,7 @@ def test_requires_bearer_token_when_supabase_configured(client):
 
     app.dependency_overrides[get_settings] = configured_settings
     try:
-        response = client.get("/api/auth/me")
+        response = client.get("/api/v1/auth/me")
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "NOT_AUTHENTICATED"
     finally:
@@ -39,7 +39,7 @@ def test_rejects_invalid_bearer_token_when_supabase_configured(client):
 
     app.dependency_overrides[get_settings] = configured_settings
     try:
-        response = client.get("/api/auth/me", headers={"Authorization": "Bearer not-a-real-token"})
+        response = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer not-a-real-token"})
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "INVALID_TOKEN"
     finally:
@@ -70,7 +70,7 @@ def test_accepts_valid_signed_token_when_supabase_configured(client):
 
     app.dependency_overrides[get_settings] = configured_settings
     try:
-        response = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+        response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert response.json()["email"] == "real.inspector@example.com"
     finally:

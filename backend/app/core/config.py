@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     api_env: str = "development"
     api_title: str = "ThinkSphere Legal Metrology Inspection API"
-    api_version: str = "0.1.0"
+    api_version: str = "1.0.0"
 
     database_url: str = "postgresql+psycopg://thinksphere:thinksphere@localhost:5432/thinksphere"
 
@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # Auth: when true, unauthenticated requests are treated as a demo
     # inspector. Only ever enabled outside production.
     allow_mock_auth: bool = True
+
+    max_image_size_mb: int = 10
+    max_images_per_inspection: int = 10
 
     @property
     def is_supabase_configured(self) -> bool:

@@ -11,7 +11,7 @@ from app.schemas.rule_result import RuleResultResponse
 from app.services import inspection_service
 from app.services.review import review_service
 
-router = APIRouter(prefix="/api/inspections", tags=["review"])
+router = APIRouter(prefix="/api/v1/inspections", tags=["review"])
 
 
 @router.patch(

@@ -12,6 +12,15 @@ from app.models.enums import ConfidenceLevel, ValidationStatus
 from app.schemas.common import ORMModel
 
 
+class FieldCandidate(BaseModel):
+    """One of several conflicting values detected across images for a
+    field — see ExtractedFieldResponse.candidates.
+    """
+
+    value: str
+    source_image_id: uuid.UUID | None = None
+
+
 class ExtractedFieldResponse(ORMModel):
     id: uuid.UUID
     inspection_id: uuid.UUID
@@ -26,6 +35,7 @@ class ExtractedFieldResponse(ORMModel):
     source_text: str | None
     manually_verified: bool
     manually_edited: bool
+    candidates: list[FieldCandidate] | None = None
 
 
 class ExtractedFieldsResponse(BaseModel):

@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import ImageProcessingStatus, ImageViewType
+from app.models.enums import ImageProcessingStatus, ImageQuality, ImageViewType
 
 if TYPE_CHECKING:
     from app.models.inspection import Inspection
@@ -28,7 +28,7 @@ class ProductImage(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     mime_type: Mapped[str] = mapped_column(String(100))
     file_size: Mapped[int] = mapped_column(Integer)
 
-    image_quality: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    image_quality: Mapped[str] = mapped_column(String(20), default=ImageQuality.UNKNOWN.value)
     quality_note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     processing_status: Mapped[str] = mapped_column(String(20), default=ImageProcessingStatus.UPLOADED.value)
 

@@ -1,10 +1,16 @@
 """Liveness check — no auth required."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-router = APIRouter(tags=["health"])
+from app.core.config import Settings, get_settings
+
+router = APIRouter(prefix="/api/v1", tags=["health"])
 
 
-@router.get("/api/health", summary="Health check")
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+@router.get("/health", summary="Health check")
+def health_check(settings: Settings = Depends(get_settings)) -> dict[str, str]:
+    return {
+        "status": "ok",
+        "service": "legal-metrology-backend",
+        "version": settings.api_version,
+    }

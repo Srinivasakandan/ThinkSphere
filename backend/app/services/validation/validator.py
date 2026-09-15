@@ -1,9 +1,10 @@
-"""Validation: structured extraction results -> Valid / Invalid / Uncertain.
+"""Validation: structured extraction results -> Valid / Invalid / Conflict / Uncertain.
 
 Validation never converts an uncertain read into a confirmed problem.
 An ambiguous OCR result (e.g. a date that might say "06/2026" or could
-be a misread) is NEEDS_REVIEW, never INVALID and never silently
-"corrected" — see spec sections 19 and 52-53.
+be a misread) is UNCERTAIN, never INVALID and never silently
+"corrected"; disagreement between images is CONFLICT, never a silently
+picked winner — see spec sections 19, 51-53.
 """
 
 import re
@@ -51,13 +52,13 @@ def _format_check(field_name: str, value: str) -> ValidationOutcome:
     elif field_name == CONSUMER_CARE:
         if not _PHONE_PATTERN.match(value):
             return ValidationOutcome(
-                ValidationStatus.NEEDS_REVIEW,
+                ValidationStatus.UNCERTAIN,
                 "Detected value does not match a standard consumer care number format.",
             )
     elif field_name == BATCH_NUMBER:
         if not _BATCH_PATTERN.match(value):
             return ValidationOutcome(
-                ValidationStatus.NEEDS_REVIEW,
+                ValidationStatus.UNCERTAIN,
                 "Detected value does not match a standard batch/lot number format.",
             )
 
@@ -68,16 +69,16 @@ def validate(result: ExtractionResult) -> ValidationOutcome:
     if result.has_conflict:
         candidates = ", ".join(result.conflict_values)
         return ValidationOutcome(
-            ValidationStatus.NEEDS_REVIEW,
+            ValidationStatus.CONFLICT,
             f"Different values were detected for {result.field_name} across product images: {candidates}.",
         )
 
     if not result.value:
-        return ValidationOutcome(ValidationStatus.NEEDS_REVIEW, "No reliable value could be extracted.")
+        return ValidationOutcome(ValidationStatus.UNCERTAIN, "No reliable value could be extracted.")
 
     if result.confidence < LOW_CONFIDENCE_THRESHOLD:
         return ValidationOutcome(
-            ValidationStatus.NEEDS_REVIEW,
+            ValidationStatus.UNCERTAIN,
             "Extraction confidence is low. Please verify this value against the original image.",
         )
 

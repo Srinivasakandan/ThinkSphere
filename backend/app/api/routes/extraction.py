@@ -14,7 +14,7 @@ from app.schemas.extraction import (
 from app.services import inspection_service
 from app.services.review import review_service
 
-router = APIRouter(prefix="/api/inspections", tags=["extraction"])
+router = APIRouter(prefix="/api/v1/inspections", tags=["extraction"])
 
 
 @router.get(

@@ -9,7 +9,7 @@ from app.api.dependencies import get_current_inspector
 from app.models.user import Inspector
 from app.schemas.inspection import InspectorResponse
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 @router.get("/me", response_model=InspectorResponse, summary="Current inspector profile")

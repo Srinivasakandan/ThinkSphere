@@ -281,7 +281,7 @@ DEMO_INSPECTIONS = [
                 "MANUFACTURING_DATE",
                 "06/2O26",
                 0.35,
-                ValidationStatus.NEEDS_REVIEW.value,
+                ValidationStatus.UNCERTAIN.value,
                 source_view="BACK",
             ),
         ],

@@ -95,6 +95,7 @@ export default function NewInspectionPage() {
           viewType: img.viewType,
           quality: img.quality,
           qualityNote: img.qualityNote,
+          file: img.file,
         }))
       );
       setConfirmOpen(false);

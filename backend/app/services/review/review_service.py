@@ -79,6 +79,7 @@ def update_extracted_field(
     field.validation_status = ValidationStatus.VALID.value
     field.validation_reason = None
     field.confidence = 1.0
+    field.candidates = None
 
     _record_review(
         db,

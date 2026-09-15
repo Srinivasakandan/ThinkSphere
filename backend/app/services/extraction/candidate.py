@@ -3,7 +3,7 @@ conflict-resolution/orchestration step in extractor.py.
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -26,6 +26,12 @@ class ImageOCRInput:
 
 
 @dataclass
+class ConflictCandidate:
+    value: str
+    source_image_id: uuid.UUID | None
+
+
+@dataclass
 class ExtractionResult:
     field_name: str
     value: str | None
@@ -35,3 +41,4 @@ class ExtractionResult:
     source_text: str | None
     has_conflict: bool
     conflict_values: list[str]
+    candidates: list[ConflictCandidate] = field(default_factory=list)

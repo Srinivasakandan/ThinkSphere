@@ -60,6 +60,7 @@ class ImageQuality(StrEnum):
     GOOD = "GOOD"
     FAIR = "FAIR"
     POOR = "POOR"
+    UNKNOWN = "UNKNOWN"
 
 
 class ConfidenceLevel(StrEnum):
@@ -71,7 +72,12 @@ class ConfidenceLevel(StrEnum):
 class ValidationStatus(StrEnum):
     VALID = "VALID"
     INVALID = "INVALID"
-    NEEDS_REVIEW = "NEEDS_REVIEW"
+    # Multiple images disagree on this field's value — never silently
+    # resolved to a winner (spec: extraction conflicts).
+    CONFLICT = "CONFLICT"
+    # A value was detected but confidence is too low to trust as-is, or
+    # nothing reliable was detected at all (spec: low OCR quality).
+    UNCERTAIN = "UNCERTAIN"
     NOT_VALIDATED = "NOT_VALIDATED"
 
 

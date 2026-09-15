@@ -27,3 +27,25 @@ class RuleResultResponse(ORMModel):
 
 class RuleResultsResponse(ORMModel):
     rules: list[RuleResultResponse]
+
+
+class RuleSummary(ORMModel):
+    rule_code: str
+    title: str
+    description: str
+    legal_source: str
+
+
+class RuleResultDetailResponse(ORMModel):
+    rule_result_id: uuid.UUID
+    rule: RuleSummary
+    field_name: str
+    detected_value: str | None
+    status: InspectionStatus
+    reason: str
+    confidence: float | None
+    evidence_image_id: uuid.UUID | None
+    reviewed: bool
+    reviewer_id: uuid.UUID | None
+    reviewed_at: datetime | None
+    inspector_note: str | None

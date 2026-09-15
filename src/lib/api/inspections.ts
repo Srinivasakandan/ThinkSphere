@@ -22,6 +22,22 @@ import { inspectionStore } from "@/lib/mock/store";
 import { runMockExtraction } from "@/lib/mock/simulate";
 import { calculateOverallStatus, summarizeRuleResults } from "@/lib/inspection/status";
 import { CURRENT_INSPECTOR } from "@/lib/mock/inspectors";
+import { apiGet, apiPatch, apiPost, apiUpload, dataUrlToBlob, isApiConfigured, ApiError } from "@/lib/api/client";
+import { mapExtractedField, mapInspectionDetail, mapInspectionSummary, mapRuleResult } from "@/lib/api/mappers";
+import type {
+  ApiExtractedFieldResponse,
+  ApiExtractedFieldUpdateRequest,
+  ApiFinalizeInspectionRequest,
+  ApiFinalizeInspectionResponse,
+  ApiInspectionCreate,
+  ApiInspectionCreateResponse,
+  ApiInspectionDetail,
+  ApiInspectionResultsResponse,
+  ApiInspectionSummary,
+  ApiPage,
+  ApiRuleResultResponse,
+  ApiRuleReviewRequest,
+} from "@/types/api";
 
 function delay<T>(value: T, ms = 350): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -50,6 +66,38 @@ export interface UploadedImageInput {
   viewType: ImageViewType;
   quality?: ImageQuality;
   qualityNote?: string;
+  /** Original File object, when available — used for the real upload so
+   * we send the actual bytes instead of round-tripping through base64. */
+  file?: File;
+}
+
+/** POST /api/v1/inspections, then POST /api/v1/inspections/{id}/images */
+async function createInspectionViaApi(
+  input: CreateInspectionInput,
+  images: UploadedImageInput[]
+): Promise<Inspection> {
+  const payload: ApiInspectionCreate = {
+    product_name: input.productName,
+    brand: input.brand,
+    category: input.category,
+    batch_number: input.batchNumber,
+    inspection_location: input.location,
+    notes: input.notes,
+  };
+  const created = await apiPost<ApiInspectionCreateResponse>("/api/v1/inspections", payload);
+
+  if (images.length > 0) {
+    const form = new FormData();
+    for (const img of images) {
+      const blob = img.file ?? (await dataUrlToBlob(img.dataUrl));
+      form.append("files", blob, img.fileName);
+      form.append("view_types", img.viewType);
+    }
+    await apiUpload(`/api/v1/inspections/${created.id}/images`, form);
+  }
+
+  const detail = await apiGet<ApiInspectionDetail>(`/api/v1/inspections/${created.id}`);
+  return mapInspectionDetail(detail);
 }
 
 /** POST /api/inspections */
@@ -57,6 +105,8 @@ export async function createInspection(
   input: CreateInspectionInput,
   images: UploadedImageInput[]
 ): Promise<Inspection> {
+  if (isApiConfigured()) return createInspectionViaApi(input, images);
+
   const id = nextInspectionId();
   const now = new Date().toISOString();
   const inspection: Inspection = {
@@ -109,8 +159,17 @@ export async function createInspection(
   return delay(inspection, 200);
 }
 
-/** GET /api/inspections/{id} */
+/** GET /api/v1/inspections/{id} */
 export async function getInspection(id: string): Promise<Inspection | undefined> {
+  if (isApiConfigured()) {
+    try {
+      const detail = await apiGet<ApiInspectionDetail>(`/api/v1/inspections/${id}`);
+      return mapInspectionDetail(detail);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return undefined;
+      throw err;
+    }
+  }
   return delay(inspectionStore.getById(id), 200);
 }
 
@@ -132,7 +191,7 @@ export interface PaginatedInspections {
   pageSize: number;
 }
 
-/** GET /api/inspections */
+/** GET /api/v1/inspections */
 export async function getInspections(
   params: GetInspectionsParams = {}
 ): Promise<PaginatedInspections> {
@@ -146,6 +205,25 @@ export async function getInspections(
     page = 1,
     pageSize = 10,
   } = params;
+
+  if (isApiConfigured()) {
+    const result = await apiGet<ApiPage<ApiInspectionSummary>>("/api/v1/inspections", {
+      search,
+      status: status && status !== "ALL" ? status : undefined,
+      category: category && category !== "ALL" ? category : undefined,
+      inspector_id: inspectorId && inspectorId !== "ALL" ? inspectorId : undefined,
+      date_from: dateFrom,
+      date_to: dateTo,
+      page,
+      page_size: pageSize,
+    });
+    return {
+      items: result.items.map(mapInspectionSummary),
+      total: result.total,
+      page: result.page,
+      pageSize: result.page_size,
+    };
+  }
 
   let items = inspectionStore.getAll().filter((i) => i.stage !== "DRAFT" && i.stage !== "UPLOADING");
 
@@ -181,10 +259,20 @@ export async function getInspections(
   return delay({ items: paged, total, page, pageSize }, 250);
 }
 
-/** GET /api/inspections/{id}/results */
+/** GET /api/v1/inspections/{id}/results */
 export async function getInspectionResults(
   id: string
 ): Promise<InspectionResultsResponse | undefined> {
+  if (isApiConfigured()) {
+    try {
+      const data = await apiGet<ApiInspectionResultsResponse>(`/api/v1/inspections/${id}/results`);
+      return { overall_status: data.overall_status, summary: data.summary };
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return undefined;
+      throw err;
+    }
+  }
+
   const inspection = inspectionStore.getById(id);
   if (!inspection) return delay(undefined);
   const summary = summarizeRuleResults(inspection.ruleResults);
@@ -199,8 +287,16 @@ export async function getInspectionResults(
   });
 }
 
-/** Simulates POST /api/inspections/{id}/process — runs OCR + rule engine. */
+/** POST /api/v1/inspections/{id}/process — runs OCR + extraction + rule engine. */
 export async function runProcessing(id: string): Promise<Inspection | undefined> {
+  if (isApiConfigured()) {
+    // Left to throw on failure (ApiError, e.g. PROCESSING_FAILED) — the
+    // processing page's try/catch around this call is exactly what
+    // surfaces that as the retry UI.
+    const detail = await apiPost<ApiInspectionDetail>(`/api/v1/inspections/${id}/process`);
+    return mapInspectionDetail(detail);
+  }
+
   const inspection = inspectionStore.getById(id);
   if (!inspection) return undefined;
   const { extractedFields, ruleResults } = runMockExtraction(inspection);
@@ -238,12 +334,21 @@ export async function runProcessing(id: string): Promise<Inspection | undefined>
   return inspectionStore.getById(id);
 }
 
-/** PATCH /api/inspections/{id}/fields/{fieldId} */
+/** PATCH /api/v1/inspections/{id}/fields/{fieldId} */
 export async function updateExtractedField(
   inspectionId: string,
   fieldId: string,
   value: string | null
 ): Promise<ExtractedField | undefined> {
+  if (isApiConfigured()) {
+    const body: ApiExtractedFieldUpdateRequest = { value, manually_verified: true };
+    const updated = await apiPatch<ApiExtractedFieldResponse>(
+      `/api/v1/inspections/${inspectionId}/fields/${fieldId}`,
+      body
+    );
+    return mapExtractedField(updated);
+  }
+
   let updated: ExtractedField | undefined;
   inspectionStore.update(inspectionId, (draft) => {
     const fields = draft.extractedFields.map((f) => {
@@ -270,13 +375,23 @@ export async function updateExtractedField(
   return delay(updated, 150);
 }
 
-/** PATCH /api/inspections/{id}/rules/{ruleId} */
+/** PATCH /api/v1/inspections/{id}/rules/{ruleId}/review */
 export async function reviewRule(
   inspectionId: string,
   ruleResultId: string,
   decision: "CONFIRMED" | "CORRECTED",
   note?: string
 ): Promise<RuleResult | undefined> {
+  if (isApiConfigured()) {
+    const body: ApiRuleReviewRequest = { reviewed: true, inspector_note: note };
+    void decision; // the backend records the review via `reviewed` + note; corrections go through updateExtractedField
+    const updated = await apiPatch<ApiRuleResultResponse>(
+      `/api/v1/inspections/${inspectionId}/rules/${ruleResultId}/review`,
+      body
+    );
+    return mapRuleResult(updated);
+  }
+
   let updated: RuleResult | undefined;
   inspectionStore.update(inspectionId, (draft) => {
     const rules = draft.ruleResults.map((r) => {
@@ -303,11 +418,23 @@ export async function reviewRule(
   return delay(updated, 150);
 }
 
-/** POST /api/inspections/{id}/finalize */
+/** POST /api/v1/inspections/{id}/finalize */
 export async function finalizeInspection(
   inspectionId: string,
   finalNotes?: string
 ): Promise<Inspection | undefined> {
+  if (isApiConfigured()) {
+    const body: ApiFinalizeInspectionRequest = { final_notes: finalNotes };
+    const result = await apiPost<ApiFinalizeInspectionResponse>(
+      `/api/v1/inspections/${inspectionId}/finalize`,
+      body
+    );
+    if (!result.can_finalize || !result.inspection) {
+      throw new Error(result.reason ?? "This inspection cannot be finalized yet.");
+    }
+    return mapInspectionDetail(result.inspection);
+  }
+
   inspectionStore.update(inspectionId, (draft) => {
     const now = new Date().toISOString();
     return {

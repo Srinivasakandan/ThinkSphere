@@ -7,7 +7,7 @@ docstring) so new declaration types never require a migration.
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Float, ForeignKey, String, Text
+from sqlalchemy import JSON, Boolean, Float, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,6 +38,12 @@ class ExtractedField(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("product_images.id"), nullable=True
     )
     source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Populated only when validation_status == CONFLICT: every distinct
+    # value detected across images, each with its source, e.g.
+    # [{"value": "₹50", "source_image_id": "..."}, ...]. Never
+    # silently collapsed to a single "winning" value.
+    candidates: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
 
     manually_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     manually_edited: Mapped[bool] = mapped_column(Boolean, default=False)

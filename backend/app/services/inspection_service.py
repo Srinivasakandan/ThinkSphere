@@ -25,7 +25,7 @@ from app.schemas.inspection import (
     ResultsSummary,
 )
 from app.schemas.product import ProductResponse
-from app.schemas.rule_result import RuleResultResponse
+from app.schemas.rule_result import RuleResultDetailResponse, RuleResultResponse, RuleSummary
 from app.services.rules.status import calculate_overall_status
 from app.services.storage import StorageService, get_storage_service
 
@@ -107,6 +107,28 @@ def to_rule_result_response(rule_result) -> RuleResultResponse:
     )
 
 
+def to_rule_result_detail(rule_result) -> RuleResultDetailResponse:
+    return RuleResultDetailResponse(
+        rule_result_id=rule_result.id,
+        rule=RuleSummary(
+            rule_code=rule_result.rule.rule_code,
+            title=rule_result.rule.title,
+            description=rule_result.rule.description,
+            legal_source=rule_result.rule.legal_source,
+        ),
+        field_name=rule_result.field_name,
+        detected_value=rule_result.detected_value,
+        status=rule_result.status,
+        reason=rule_result.reason,
+        confidence=rule_result.confidence,
+        evidence_image_id=rule_result.evidence_image_id,
+        reviewed=rule_result.reviewed,
+        reviewer_id=rule_result.reviewer_id,
+        reviewed_at=rule_result.reviewed_at,
+        inspector_note=rule_result.inspector_note,
+    )
+
+
 def to_detail(inspection: Inspection, storage: StorageService) -> InspectionDetail:
     return InspectionDetail(
         id=inspection.id,
@@ -167,6 +189,12 @@ def finalize_inspection(
     final_notes: str | None,
     settings: Settings,
 ) -> FinalizeInspectionResponse:
+    # Row lock closes the race between two concurrent finalize requests
+    # for the same inspection (spec section 56).
+    locked = inspection_repository.get_for_update(db, inspection.id)
+    if locked is not None:
+        inspection = locked
+
     if inspection.stage == InspectionStage.FINALIZED.value:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

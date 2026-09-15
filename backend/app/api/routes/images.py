@@ -13,7 +13,7 @@ from app.schemas.image import ImageResponse
 from app.services import image_service, inspection_service
 from app.services.storage import get_storage_service
 
-router = APIRouter(prefix="/api/inspections", tags=["images"])
+router = APIRouter(prefix="/api/v1/inspections", tags=["images"])
 
 
 @router.post("/{inspection_id}/images", response_model=list[ImageResponse], summary="Upload product images")
@@ -39,6 +39,7 @@ async def upload_images(
         view_types=resolved_view_types,
         storage=storage,
         user_id=inspector.id,
+        settings=settings,
     )
     return [inspection_service.to_image_response(img, storage) for img in images]
 

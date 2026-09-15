@@ -1,4 +1,4 @@
-"""Validation tests — spec sections 19, 52, 53."""
+"""Validation tests — spec sections 19, 51-53."""
 
 import uuid
 
@@ -32,23 +32,23 @@ def test_valid_quantity_passes():
     assert outcome.status == ValidationStatus.VALID
 
 
-def test_low_confidence_is_needs_review_not_invalid():
+def test_low_confidence_is_uncertain_not_invalid():
     """A weak signal is uncertain, not wrong — never silently escalated
     to INVALID/violation territory."""
     outcome = validate(make_result("MRP", "₹50", confidence=0.2))
-    assert outcome.status == ValidationStatus.NEEDS_REVIEW
+    assert outcome.status == ValidationStatus.UNCERTAIN
 
 
-def test_conflict_is_needs_review_with_reason_listing_candidates():
+def test_conflict_is_conflict_status_with_reason_listing_candidates():
     outcome = validate(make_result("MRP", "₹50", has_conflict=True, conflict_values=["₹50", "₹55"]))
-    assert outcome.status == ValidationStatus.NEEDS_REVIEW
+    assert outcome.status == ValidationStatus.CONFLICT
     assert "₹50" in outcome.reason
     assert "₹55" in outcome.reason
 
 
-def test_missing_value_is_needs_review():
+def test_missing_value_is_uncertain():
     outcome = validate(make_result("MRP", None))
-    assert outcome.status == ValidationStatus.NEEDS_REVIEW
+    assert outcome.status == ValidationStatus.UNCERTAIN
 
 
 def test_negative_mrp_is_invalid():
@@ -56,6 +56,6 @@ def test_negative_mrp_is_invalid():
     assert outcome.status == ValidationStatus.INVALID
 
 
-def test_malformed_phone_is_needs_review():
+def test_malformed_phone_is_uncertain():
     outcome = validate(make_result("CONSUMER_CARE", "12345"))
-    assert outcome.status == ValidationStatus.NEEDS_REVIEW
+    assert outcome.status == ValidationStatus.UNCERTAIN

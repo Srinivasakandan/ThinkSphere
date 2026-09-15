@@ -11,7 +11,7 @@ from app.schemas.dashboard import (
 )
 from app.services.dashboard import dashboard_service
 
-router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
 
 
 @router.get("/summary", response_model=DashboardSummaryResponse, summary="Dashboard summary counts")

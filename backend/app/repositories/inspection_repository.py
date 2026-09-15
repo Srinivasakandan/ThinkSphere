@@ -7,12 +7,13 @@ import uuid
 from typing import Any
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, lazyload
 
 from app.models.audit_log import AuditLog
 from app.models.enums import InspectionStage
 from app.models.extracted_field import ExtractedField
 from app.models.inspection import Inspection
+from app.models.ocr_result import OCRResult
 from app.models.product import Product
 from app.models.product_image import ProductImage
 
@@ -37,6 +38,28 @@ def get(db: Session, inspection_id: uuid.UUID) -> Inspection | None:
         )
     )
     return db.execute(stmt).unique().scalar_one_or_none()
+
+
+def get_for_update(db: Session, inspection_id: uuid.UUID) -> Inspection | None:
+    """Row-locked read for the start of processing/finalization, so two
+    concurrent requests against the same inspection serialize instead of
+    racing (spec section 56: concurrency).
+    """
+    # Postgres refuses FOR UPDATE on the nullable side of an outer join,
+    # so override the inspector relationship's mapper-level joined-eager
+    # default (Inspection.inspector uses lazy="joined") for this query.
+    stmt = (
+        select(Inspection)
+        .where(Inspection.id == inspection_id)
+        .options(lazyload(Inspection.inspector))
+        .with_for_update()
+    )
+    inspection = db.execute(stmt).scalar_one_or_none()
+    if inspection is not None:
+        # Row lock is held on the base table; eagerly load the relationships
+        # the caller needs without a second, unlocked SELECT.
+        db.refresh(inspection, attribute_names=["product", "images", "extracted_fields", "rule_results"])
+    return inspection
 
 
 def list_inspections(
@@ -114,6 +137,16 @@ def get_extracted_field(db: Session, field_id: uuid.UUID) -> ExtractedField | No
 def list_images(db: Session, inspection_id: uuid.UUID) -> list[ProductImage]:
     stmt = (
         select(ProductImage)
+        .where(ProductImage.inspection_id == inspection_id)
+        .order_by(ProductImage.created_at)
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def list_ocr_results(db: Session, inspection_id: uuid.UUID) -> list[OCRResult]:
+    stmt = (
+        select(OCRResult)
+        .join(ProductImage, ProductImage.id == OCRResult.image_id)
         .where(ProductImage.inspection_id == inspection_id)
         .order_by(ProductImage.created_at)
     )

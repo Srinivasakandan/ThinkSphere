@@ -73,15 +73,15 @@ class RequiredFieldEvaluator(BaseRuleEvaluator):
                 evidence_image_id=field.source_image_id,
             )
 
-        if field.validation_status == ValidationStatus.NEEDS_REVIEW:
-            return _uncertain_field_outcome(field)
-
         if field.validation_status == ValidationStatus.INVALID:
             return _uncertain_field_outcome(
                 field,
                 "A value was detected but does not match the expected format. "
                 "Inspector verification required.",
             )
+
+        if field.validation_status != ValidationStatus.VALID:
+            return _uncertain_field_outcome(field)
 
         if field.confidence < LOW_CONFIDENCE_THRESHOLD:
             return _uncertain_field_outcome(field)
