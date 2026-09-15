@@ -1,0 +1,15 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.20
+httpx==0.28.1
+Pillow==11.0.0
+pytesseract==0.3.13
+reportlab==4.2.5
+structlog==24.4.0
+python-dotenv==1.0.1

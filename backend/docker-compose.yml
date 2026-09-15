@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: thinksphere
+      POSTGRES_PASSWORD: thinksphere
+      POSTGRES_DB: thinksphere
+    ports:
+      - "5432:5432"
+    volumes:
+      - thinksphere_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U thinksphere"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://thinksphere:thinksphere@db:5432/thinksphere
+      FRONTEND_URL: http://localhost:3000
+      OCR_PROVIDER: mock
+      LOCAL_STORAGE_DIR: /app/storage_mock
+      API_ENV: development
+      ALLOW_MOCK_AUTH: "true"
+      # Leave blank for mock mode; set to connect a real Supabase project.
+      SUPABASE_URL: ""
+      SUPABASE_ANON_KEY: ""
+      SUPABASE_SERVICE_ROLE_KEY: ""
+      SUPABASE_JWT_SECRET: ""
+      SUPABASE_STORAGE_BUCKET: inspection-images
+    volumes:
+      - thinksphere_storage:/app/storage_mock
+
+volumes:
+  thinksphere_pgdata:
+  thinksphere_storage:

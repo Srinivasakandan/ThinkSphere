@@ -1,0 +1,38 @@
+"""Reference list of known declaration field names.
+
+This is intentionally a plain list, not a database enum or a frontend
+hardcoded schema — new field types can be added here without a
+migration. See app.models.enums module docstring.
+"""
+
+PRODUCT_NAME = "PRODUCT_NAME"
+BRAND = "BRAND"
+GENERIC_NAME = "GENERIC_NAME"
+MRP = "MRP"
+NET_QUANTITY = "NET_QUANTITY"
+MANUFACTURER = "MANUFACTURER"
+MANUFACTURING_DATE = "MANUFACTURING_DATE"
+PACKING_DATE = "PACKING_DATE"
+BEST_BEFORE = "BEST_BEFORE"
+IMPORTER = "IMPORTER"
+CONSUMER_CARE = "CONSUMER_CARE"
+BATCH_NUMBER = "BATCH_NUMBER"
+COUNTRY_OF_ORIGIN = "COUNTRY_OF_ORIGIN"
+UNIT_SALE_PRICE = "UNIT_SALE_PRICE"
+
+KNOWN_FIELDS = [
+    PRODUCT_NAME,
+    BRAND,
+    GENERIC_NAME,
+    MRP,
+    NET_QUANTITY,
+    MANUFACTURER,
+    MANUFACTURING_DATE,
+    PACKING_DATE,
+    BEST_BEFORE,
+    IMPORTER,
+    CONSUMER_CARE,
+    BATCH_NUMBER,
+    COUNTRY_OF_ORIGIN,
+    UNIT_SALE_PRICE,
+]
