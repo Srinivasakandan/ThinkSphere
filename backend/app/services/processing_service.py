@@ -26,6 +26,7 @@ from app.schemas.inspection import ProcessingPipelineStage, ProcessingStatusResp
 from app.services.evidence import locate_bounding_box
 from app.services.extraction.candidate import ImageOCRInput
 from app.services.extraction.extractor import extract_product_information
+from app.services.imaging import POOR_IMAGE_QUALITY_NOTE
 from app.services.ocr import OCRService
 from app.services.rules.context import FieldSnapshot, RuleEvaluationInput
 from app.services.rules.rule_engine import evaluate_all
@@ -43,12 +44,25 @@ class ProcessingError(RuntimeError):
     pass
 
 
+_QUALITY_RANK = {ImageQuality.POOR.value: 0, ImageQuality.FAIR.value: 1, ImageQuality.GOOD.value: 2}
+
+
 def _quality_for_confidence(confidence: float) -> str:
     if confidence >= FAIR_QUALITY_THRESHOLD:
         return ImageQuality.GOOD.value
     if confidence >= POOR_QUALITY_THRESHOLD:
         return ImageQuality.FAIR.value
     return ImageQuality.POOR.value
+
+
+def _worse_quality(a: str, b: str) -> str:
+    # UNKNOWN (no prior signal, e.g. blur check unavailable) never wins
+    # over an actual grade in either direction.
+    if a not in _QUALITY_RANK:
+        return b
+    if b not in _QUALITY_RANK:
+        return a
+    return a if _QUALITY_RANK[a] <= _QUALITY_RANK[b] else b
 
 
 async def run_processing(
@@ -125,11 +139,15 @@ async def run_processing(
                     ocr_confidence=ocr_result_data.confidence,
                 )
             )
-            image.image_quality = _quality_for_confidence(ocr_result_data.confidence)
+            # Combine with whatever quality signal was already set at
+            # upload time (the blur check in image_service.upload_images)
+            # — a real "this photo is blurry" finding is never silently
+            # overwritten by a decent OCR confidence score, and vice
+            # versa: the worse of the two grades wins.
+            ocr_quality = _quality_for_confidence(ocr_result_data.confidence)
+            image.image_quality = _worse_quality(image.image_quality, ocr_quality)
             image.quality_note = (
-                "Image may be difficult to read. Consider retaking this image."
-                if image.image_quality == ImageQuality.POOR.value
-                else None
+                POOR_IMAGE_QUALITY_NOTE if image.image_quality == ImageQuality.POOR.value else None
             )
             image.processing_status = "PROCESSED"
 

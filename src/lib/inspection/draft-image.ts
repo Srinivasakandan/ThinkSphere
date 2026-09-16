@@ -10,20 +10,6 @@ export interface DraftImage {
   qualityNote?: string;
 }
 
-const QUALITY_CYCLE: ImageQuality[] = ["GOOD", "GOOD", "GOOD", "FAIR", "POOR"];
-
-/** Deterministic mock quality signal — a real backend would return this from OCR pre-checks. */
-export function mockQualityForIndex(index: number): { quality: ImageQuality; note?: string } {
-  const quality = QUALITY_CYCLE[index % QUALITY_CYCLE.length];
-  return {
-    quality,
-    note:
-      quality === "POOR"
-        ? "Image may be difficult to read. Consider retaking this image."
-        : undefined,
-  };
-}
-
 export const VIEW_TYPE_OPTIONS: { value: ImageViewType; label: string }[] = [
   { value: "FRONT", label: "Front" },
   { value: "BACK", label: "Back" },

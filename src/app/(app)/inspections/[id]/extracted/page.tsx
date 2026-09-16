@@ -7,6 +7,7 @@ import { usePageHeader } from "@/components/layout/page-header-context";
 import { InspectionStepper } from "@/components/inspection/inspection-stepper";
 import { ExtractedFieldCard } from "@/components/inspection/extracted-field-card";
 import { ImageViewer } from "@/components/inspection/image-viewer";
+import { ManualInspectionBanner } from "@/components/inspection/manual-inspection-banner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/common/error-state";
@@ -74,6 +75,11 @@ export default function ExtractedInformationPage({ params }: { params: Promise<{
           <InspectionStepper currentStep={3} />
         </CardContent>
       </Card>
+
+      <ManualInspectionBanner
+        poorCount={inspection.images.filter((img) => img.quality === "POOR").length}
+        totalCount={inspection.images.length}
+      />
 
       <Card>
         <CardHeader>

@@ -10,6 +10,7 @@ import { InspectionSummary } from "@/components/inspection/inspection-summary";
 import { InspectorReview } from "@/components/inspection/inspector-review";
 import { FinalizeDialog } from "@/components/inspection/finalize-dialog";
 import { ImageViewer } from "@/components/inspection/image-viewer";
+import { ManualInspectionBanner } from "@/components/inspection/manual-inspection-banner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/common/error-state";
@@ -118,6 +119,11 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
       )}
+
+      <ManualInspectionBanner
+        poorCount={inspection.images.filter((img) => img.quality === "POOR").length}
+        totalCount={inspection.images.length}
+      />
 
       <InspectionSummary inspection={inspection} />
 
