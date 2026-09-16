@@ -9,10 +9,11 @@ from PIL import UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.models.enums import AuditAction, ImageProcessingStatus, ImageViewType, InspectionStage
+from app.models.enums import AuditAction, ImageProcessingStatus, ImageQuality, ImageViewType, InspectionStage
 from app.models.inspection import Inspection
 from app.models.product_image import ProductImage
 from app.repositories import inspection_repository
+from app.services.imaging import POOR_IMAGE_QUALITY_NOTE, compute_blur_score
 from app.services.storage import StorageService
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
@@ -96,6 +97,18 @@ async def upload_images(
         storage_path = f"inspections/{inspection.id}/{image_id}/original.{extension}"
         await storage.upload_file(path=storage_path, content=content, content_type=mime_type)
 
+        # Blur is checked immediately at upload — before OCR even runs —
+        # so a blurry photo is flagged right away rather than only after
+        # a full processing pass. compute_blur_score returns None (no
+        # signal) rather than raising when OpenCV isn't installed or the
+        # image can't be decoded; that's never treated as a pass.
+        blur = compute_blur_score(content)
+        image_quality = ImageQuality.UNKNOWN.value
+        quality_note = None
+        if blur is not None and blur.quality == ImageQuality.POOR.value:
+            image_quality = ImageQuality.POOR.value
+            quality_note = POOR_IMAGE_QUALITY_NOTE
+
         image = ProductImage(
             id=image_id,
             inspection_id=inspection.id,
@@ -104,6 +117,8 @@ async def upload_images(
             view_type=view_type.upper(),
             mime_type=mime_type,
             file_size=len(content),
+            image_quality=image_quality,
+            quality_note=quality_note,
             processing_status=ImageProcessingStatus.UPLOADED.value,
         )
         db.add(image)

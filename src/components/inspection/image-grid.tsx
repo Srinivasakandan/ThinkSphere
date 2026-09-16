@@ -72,7 +72,7 @@ export function ImageGrid({ images, onRemove, onViewTypeChange }: ImageGridProps
             {img.quality === "POOR" && (
               <p className="flex items-start gap-1 text-[11px] leading-snug text-status-warn">
                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                Image may be difficult to read. Consider retaking this image.
+                {img.qualityNote ?? "Image may be difficult to read. Consider retaking this image."}
               </p>
             )}
           </div>

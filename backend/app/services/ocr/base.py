@@ -33,6 +33,12 @@ class OCRResultData:
     words: list[WordBox] = field(default_factory=list)
     image_width: int = 0
     image_height: int = 0
+    # False only when no real OCR engine ran at all (e.g. Tesseract isn't
+    # installed and OCR_PROVIDER=auto had nothing to fall back to but a
+    # "no text available" result) — distinct from a real engine simply
+    # reading a hard image poorly. Extraction must never invent plausible
+    # label text to paper over this; see UnavailableOCRService.
+    engine_available: bool = True
 
 
 class OCRService(ABC):

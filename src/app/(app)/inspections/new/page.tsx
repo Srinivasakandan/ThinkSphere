@@ -7,6 +7,7 @@ import { usePageHeader } from "@/components/layout/page-header-context";
 import { InspectionStepper } from "@/components/inspection/inspection-stepper";
 import { ImageUploader } from "@/components/inspection/image-uploader";
 import { ImageGrid } from "@/components/inspection/image-grid";
+import { ManualInspectionBanner } from "@/components/inspection/manual-inspection-banner";
 import { ProductInfoForm, type ProductInfoValues } from "@/components/inspection/product-info-form";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,10 +22,10 @@ import {
 import type { ImageViewType } from "@/types";
 import {
   defaultViewTypeForIndex,
-  mockQualityForIndex,
   readFileAsDataUrl,
   type DraftImage,
 } from "@/lib/inspection/draft-image";
+import { assessImageQuality } from "@/lib/inspection/blur-detect";
 import { createInspection } from "@/lib/api/inspections";
 
 const EMPTY_PRODUCT_INFO: ProductInfoValues = {
@@ -53,7 +54,7 @@ export default function NewInspectionPage() {
       files.map(async (file, offset) => {
         const dataUrl = await readFileAsDataUrl(file);
         const index = startIndex + offset;
-        const { quality, note } = mockQualityForIndex(index);
+        const { quality, note } = await assessImageQuality(file);
         const draft: DraftImage = {
           clientId: `${file.name}-${index}-${Date.now()}`,
           file,
@@ -131,6 +132,11 @@ export default function NewInspectionPage() {
               All uploaded images belong to this single inspection.
             </div>
           )}
+
+          <ManualInspectionBanner
+            poorCount={images.filter((img) => img.quality === "POOR").length}
+            totalCount={images.length}
+          />
 
           <ImageGrid images={images} onRemove={handleRemove} onViewTypeChange={handleViewTypeChange} />
         </CardContent>

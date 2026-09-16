@@ -18,8 +18,11 @@ below).
 - Supabase Auth (JWT verification) and Supabase Storage — both optional;
   see **Mock mode**
 - Tesseract OCR (open-source) via `pytesseract`, used automatically
-  when installed (`OCR_PROVIDER=auto`, the default), with a
-  deterministic mock OCR engine as the fallback when it isn't
+  when installed (`OCR_PROVIDER=auto`, the default). When it isn't
+  installed, the API reports "no text detected" for every image rather
+  than ever fabricating plausible label content — the deterministic
+  mock OCR engine that does generate realistic demo text only runs
+  under the explicit, disclosed `OCR_PROVIDER=mock`
 - OpenCV (`opencv-python-headless`) preprocesses every image — EXIF
   auto-rotate, deskew, contrast enhancement — before OCR runs
   (`app/services/imaging/`)
@@ -200,11 +203,17 @@ works with zero external services configured:
   (`app/services/ocr/local_ocr.py`, behind OpenCV preprocessing in
   `app/services/imaging/`) when the `tesseract-ocr` binary is on PATH
   (it is in the Docker image; install with `apt-get install
-  tesseract-ocr` locally), otherwise a deterministic mock engine
-  generates realistic packaged-label text keyed by image filename so
-  processing stays reproducible without it. Set `OCR_PROVIDER=tesseract`
-  to require real OCR (fails loudly if missing) or `OCR_PROVIDER=mock`
-  to force the deterministic engine regardless of what's installed.
+  tesseract-ocr` locally). When it isn't, `UnavailableOCRService`
+  reports zero-confidence, empty text for every image — extraction
+  finds nothing and every requirement correctly routes to
+  `NEEDS_REVIEW` — rather than ever presenting fabricated label content
+  as a real result. Set `OCR_PROVIDER=tesseract` to require real OCR
+  (fails loudly if missing), or `OCR_PROVIDER=mock` to explicitly opt
+  into `MockOCRService`'s deterministic demo text (keyed by image
+  filename, so a given demo image always produces the same result) —
+  useful for exercising the UI without Tesseract installed, but never
+  the default, since an unnoticed missing install must never look
+  identical to a working extraction pipeline.
 - **Rules**: the seed script's rules are explicitly `is_demo=True` with
   a `legal_source` that says so — replace them with verified Legal
   Metrology rule text before any production use; nothing in application

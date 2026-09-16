@@ -4,7 +4,15 @@
 installed — the preferred path for local development per the build
 spec. `MockOCRService` needs no external engine at all and produces
 deterministic, realistic packaged-commodity label text so the full
-extraction/validation/rule pipeline can be exercised in demo mode.
+extraction/validation/rule pipeline can be exercised in demo mode —
+used only when OCR_PROVIDER=mock is set explicitly, a disclosed,
+deliberate developer choice. `UnavailableOCRService` is what OCR_PROVIDER
+=auto (the default) falls back to instead when no real engine is
+installed: it reports "no text detected" rather than ever inventing
+plausible-looking label content, because unlike MockOCRService's caller
+that choice wasn't disclosed or deliberate — fabricated brand names and
+prices presented as real extraction results would be actively dangerous
+in a compliance tool.
 """
 
 import hashlib
@@ -18,6 +26,24 @@ from app.services.ocr.base import OCRResultData, OCRService, WordBox
 class TesseractUnavailableError(RuntimeError):
     """Raised when the tesseract binary itself (not just the pytesseract
     Python wrapper) cannot be found — distinct from a bad input image."""
+
+
+class UnavailableOCRService(OCRService):
+    """No real OCR engine could be found. Reports zero-confidence, empty
+    text for every image — never invents plausible label content — so
+    the pipeline correctly extracts nothing and routes every requirement
+    to NEEDS_REVIEW rather than presenting fabricated values as findings.
+    """
+
+    async def process_image(
+        self,
+        image_bytes: bytes,
+        *,
+        mime_type: str,
+        original_filename: str,
+        view_type: str,
+    ) -> OCRResultData:
+        return OCRResultData(raw_text="", confidence=0.0, engine_available=False)
 
 
 class TesseractOCRService(OCRService):

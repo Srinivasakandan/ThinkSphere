@@ -7,7 +7,7 @@ from functools import lru_cache
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.services.ocr.base import OCRResultData, OCRService, WordBox
-from app.services.ocr.local_ocr import MockOCRService, TesseractOCRService
+from app.services.ocr.local_ocr import MockOCRService, TesseractOCRService, UnavailableOCRService
 
 __all__ = ["OCRResultData", "OCRService", "WordBox", "get_ocr_service"]
 
@@ -35,13 +35,17 @@ def get_ocr_service(settings: Settings) -> OCRService:
         return TesseractOCRService()
 
     # "auto" (the default): read whatever was actually photographed/scanned
-    # when the real OCR engine is installed, otherwise degrade to
-    # deterministic mock data rather than fail to start.
+    # when the real OCR engine is installed. When it isn't, report "no
+    # text detected" (UnavailableOCRService) rather than start without
+    # crashing but silently. MockOCRService's fabricated demo content is
+    # reserved for OCR_PROVIDER=mock, an explicit, disclosed choice — an
+    # unnoticed missing Tesseract install must never be indistinguishable
+    # from a real, working extraction pipeline.
     if _tesseract_binary_available():
         return TesseractOCRService()
 
     logger.warning(
-        "ocr_falling_back_to_mock",
+        "ocr_engine_unavailable",
         reason="tesseract binary not found on PATH — install tesseract-ocr for real OCR",
     )
-    return MockOCRService()
+    return UnavailableOCRService()
