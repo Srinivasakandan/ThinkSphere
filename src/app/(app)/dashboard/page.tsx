@@ -12,47 +12,76 @@ import { DashboardSkeleton } from "@/components/common/skeletons";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getInspections } from "@/lib/api/inspections";
-import { INSPECTION_TREND, COMPLIANCE_DISTRIBUTION, DASHBOARD_TOTALS } from "@/lib/mock/dashboard";
+import { getDashboardSummary, getDashboardTrends } from "@/lib/api/dashboard";
+import type { DistributionSlice, TrendPoint } from "@/lib/mock/dashboard";
 import type { Inspection } from "@/types";
+
+interface DashboardData {
+  totals: { total: number; passed: number; potentialNonCompliance: number; needsReview: number };
+  trend: TrendPoint[];
+  distribution: DistributionSlice[];
+  inspections: Inspection[];
+}
 
 export default function DashboardPage() {
   usePageHeader("Dashboard");
-  const [inspections, setInspections] = useState<Inspection[] | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
     let active = true;
-    getInspections({ pageSize: 6 }).then((res) => {
-      if (active) setInspections(res.items);
-    });
+    Promise.all([getDashboardSummary(), getDashboardTrends(), getInspections({ pageSize: 6 })]).then(
+      ([summary, trends, recent]) => {
+        if (!active) return;
+        setData({
+          totals: {
+            total: summary.total,
+            passed: summary.passed,
+            potentialNonCompliance: summary.potential_non_compliance,
+            needsReview: summary.needs_review,
+          },
+          trend: trends.points.map((p) => ({ date: p.date, inspections: p.inspections })),
+          distribution: [
+            { name: "Pass", value: summary.passed, status: "PASS" },
+            {
+              name: "Potential Non-Compliance",
+              value: summary.potential_non_compliance,
+              status: "POTENTIAL_NON_COMPLIANCE",
+            },
+            { name: "Needs Review", value: summary.needs_review, status: "NEEDS_REVIEW" },
+          ],
+          inspections: recent.items,
+        });
+      }
+    );
     return () => {
       active = false;
     };
   }, []);
 
-  if (!inspections) return <DashboardSkeleton />;
+  if (!data) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Total Inspections" value={DASHBOARD_TOTALS.total} icon={ClipboardList} tone="neutral" />
-        <SummaryCard label="Pass" value={DASHBOARD_TOTALS.passed} icon={CheckCircle2} tone="pass" />
+        <SummaryCard label="Total Inspections" value={data.totals.total} icon={ClipboardList} tone="neutral" />
+        <SummaryCard label="Pass" value={data.totals.passed} icon={CheckCircle2} tone="pass" />
         <SummaryCard
           label="Potential Non-Compliance"
-          value={DASHBOARD_TOTALS.potentialNonCompliance}
+          value={data.totals.potentialNonCompliance}
           icon={XCircle}
           tone="fail"
         />
-        <SummaryCard label="Needs Review" value={DASHBOARD_TOTALS.needsReview} icon={AlertTriangle} tone="warn" />
+        <SummaryCard label="Needs Review" value={data.totals.needsReview} icon={AlertTriangle} tone="warn" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <InspectionTrendChart data={INSPECTION_TREND} />
+          <InspectionTrendChart data={data.trend} />
         </div>
-        <ComplianceDistribution data={COMPLIANCE_DISTRIBUTION} />
+        <ComplianceDistribution data={data.distribution} />
       </div>
 
-      <RecentInspections inspections={inspections} />
+      <RecentInspections inspections={data.inspections} />
 
       <Card>
         <CardContent className="pt-5">
