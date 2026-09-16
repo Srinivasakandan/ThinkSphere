@@ -39,6 +39,12 @@ POOR_QUALITY_THRESHOLD = 0.5
 FAIR_QUALITY_THRESHOLD = 0.8
 UNRELIABLE_POOR_FRACTION = 0.5
 
+OCR_UNAVAILABLE_NOTE = (
+    "No OCR engine is available on this server, so this image could not be read at all. "
+    "This is a deployment issue, not a problem with the photo — every declaration for this "
+    "item requires manual entry until the OCR engine is installed."
+)
+
 
 class ProcessingError(RuntimeError):
     pass
@@ -146,9 +152,16 @@ async def run_processing(
             # versa: the worse of the two grades wins.
             ocr_quality = _quality_for_confidence(ocr_result_data.confidence)
             image.image_quality = _worse_quality(image.image_quality, ocr_quality)
-            image.quality_note = (
-                POOR_IMAGE_QUALITY_NOTE if image.image_quality == ImageQuality.POOR.value else None
-            )
+            if not ocr_result_data.engine_available:
+                # Distinct from "this photo is blurry" — the photo itself
+                # was never evaluated at all, so retaking it won't help;
+                # this is a deployment issue, not something the image
+                # capture can fix.
+                image.quality_note = OCR_UNAVAILABLE_NOTE
+            elif image.image_quality == ImageQuality.POOR.value:
+                image.quality_note = POOR_IMAGE_QUALITY_NOTE
+            else:
+                image.quality_note = None
             image.processing_status = "PROCESSED"
 
             ocr_inputs.append(
