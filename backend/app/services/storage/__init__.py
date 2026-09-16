@@ -20,5 +20,6 @@ def get_storage_service(settings: Settings) -> StorageService:
 
     global _local_singleton
     if _local_singleton is None:
-        _local_singleton = LocalFileStorageService(settings.local_storage_dir)
+        public_base_url = f"{settings.backend_public_url.rstrip('/')}/media" if settings.backend_public_url else "/media"
+        _local_singleton = LocalFileStorageService(settings.local_storage_dir, public_base_url=public_base_url)
     return _local_singleton
