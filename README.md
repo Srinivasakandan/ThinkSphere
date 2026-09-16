@@ -62,6 +62,28 @@ set, the app automatically runs in **demo mode**:
 This keeps frontend development fully unblocked while the FastAPI
 backend is being built.
 
+## Running in dynamic mode (real OCR, not canned data)
+
+By default, this app runs against whatever you actually upload or scan —
+not pre-scripted demo responses:
+
+1. Set `NEXT_PUBLIC_API_BASE_URL` (see `.env.example`) so the frontend
+   calls the real FastAPI backend instead of `src/lib/mock/*`.
+2. Run the backend (`backend/README.md`) against a real Postgres
+   database. `OCR_PROVIDER=auto` (the backend default) uses real
+   Tesseract OCR when `tesseract-ocr` is installed
+   (`apt-get install tesseract-ocr` on Debian/Ubuntu) and falls back to
+   deterministic mock text only when it isn't — set `OCR_PROVIDER=mock`
+   explicitly to force the old static behavior.
+3. Images are run through OpenCV preprocessing (auto-rotate, deskew,
+   contrast enhancement — `backend/app/services/imaging/`) before OCR,
+   so a real, possibly tilted phone photo or scan reads reliably.
+
+Every extracted field also carries a bounding box locating where on the
+source image it was read from (`backend/app/services/evidence.py`), so
+the extracted-information and rule-evaluation screens can highlight the
+exact evidence, not just name the source image.
+
 ## Folder structure
 
 ```
@@ -127,9 +149,13 @@ boundary.
 
 ## How the inspection workflow works
 
-1. **Upload** — `/inspections/new` collects 1–10 images of a single
-   physical product (front/back/left/right/top/bottom/other) plus
-   optional product info, then calls `createInspection()`.
+1. **Upload or Scan** — `/inspections/new` collects 1–10 images of a
+   single physical product (front/back/left/right/top/bottom/other),
+   either by uploading image files or by capturing them directly with
+   the device camera (`components/inspection/camera-capture.tsx` — a
+   live in-browser capture dialog, with a native device-camera-app
+   fallback for browsers without camera API support), plus optional
+   product info, then calls `createInspection()`.
 2. **Processing** — `/inspections/[id]/processing` shows a step-by-step
    progress indicator, then calls `runProcessing()`, which runs the mock
    OCR/extraction/rule-engine pass and stores the results.

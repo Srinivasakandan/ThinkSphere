@@ -21,7 +21,7 @@ import {
   reviewRule,
   updateExtractedField,
 } from "@/lib/api/inspections";
-import type { Inspection } from "@/types";
+import type { BoundingBox, Inspection } from "@/types";
 
 export default function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,6 +34,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const router = useRouter();
   const [inspection, setInspection] = useState<Inspection | null | undefined>(undefined);
   const [viewerImageId, setViewerImageId] = useState<string | null>(null);
+  const [viewerHighlight, setViewerHighlight] = useState<BoundingBox | undefined>(undefined);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
 
@@ -133,7 +134,10 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
             rules={inspection.ruleResults}
             fields={inspection.extractedFields}
             images={inspection.images}
-            onViewEvidence={setViewerImageId}
+            onViewEvidence={(imageId, boundingBox) => {
+              setViewerHighlight(boundingBox);
+              setViewerImageId(imageId);
+            }}
             onConfirm={handleConfirm}
             onCorrect={handleCorrect}
           />
@@ -162,7 +166,15 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
         isSubmitting={isFinalizing}
         pendingReviewCount={pendingReviewCount}
       />
-      <ImageViewer images={inspection.images} openImageId={viewerImageId} onOpenChange={setViewerImageId} />
+      <ImageViewer
+        images={inspection.images}
+        openImageId={viewerImageId}
+        onOpenChange={(imageId) => {
+          setViewerImageId(imageId);
+          setViewerHighlight(undefined);
+        }}
+        highlightBox={viewerHighlight}
+      />
     </div>
   );
 }

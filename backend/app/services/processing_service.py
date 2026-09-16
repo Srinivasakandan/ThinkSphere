@@ -23,6 +23,7 @@ from app.models.inspection import Inspection
 from app.models.ocr_result import OCRResult
 from app.repositories import inspection_repository, result_repository
 from app.schemas.inspection import ProcessingPipelineStage, ProcessingStatusResponse
+from app.services.evidence import locate_bounding_box
 from app.services.extraction.candidate import ImageOCRInput
 from app.services.extraction.extractor import extract_product_information
 from app.services.ocr import OCRService
@@ -138,6 +139,9 @@ async def run_processing(
                     raw_text=ocr_result_data.raw_text,
                     ocr_confidence=ocr_result_data.confidence,
                     view_type=image.view_type,
+                    words=ocr_result_data.words,
+                    image_width=ocr_result_data.image_width,
+                    image_height=ocr_result_data.image_height,
                 )
             )
 
@@ -162,9 +166,22 @@ async def run_processing(
         db.commit()
 
         # --- Validation ----------------------------------------------------
+        ocr_inputs_by_image = {inp.image_id: inp for inp in ocr_inputs}
         field_rows = []
         for result in extraction_results:
             outcome = validate_field(result)
+            source_ocr = ocr_inputs_by_image.get(result.source_image_id) if result.source_image_id else None
+            bounding_box = (
+                locate_bounding_box(
+                    words=source_ocr.words,
+                    raw_text=source_ocr.raw_text,
+                    source_text=result.source_text,
+                    image_width=source_ocr.image_width,
+                    image_height=source_ocr.image_height,
+                )
+                if source_ocr
+                else None
+            )
             field_rows.append(
                 {
                     "field_name": result.field_name,
@@ -176,6 +193,7 @@ async def run_processing(
                     "validation_reason": outcome.reason,
                     "source_image_id": result.source_image_id,
                     "source_text": result.source_text,
+                    "bounding_box": bounding_box,
                     "manually_verified": False,
                     "manually_edited": False,
                     "candidates": (

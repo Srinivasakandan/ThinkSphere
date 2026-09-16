@@ -21,6 +21,16 @@ class FieldCandidate(BaseModel):
     source_image_id: uuid.UUID | None = None
 
 
+class FieldBoundingBox(BaseModel):
+    """Normalized (0-1 fraction of image width/height) region on the
+    source image — see app.services.evidence.locate_bounding_box."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+
 class ExtractedFieldResponse(ORMModel):
     id: uuid.UUID
     inspection_id: uuid.UUID
@@ -33,6 +43,7 @@ class ExtractedFieldResponse(ORMModel):
     validation_reason: str | None
     source_image_id: uuid.UUID | None
     source_text: str | None
+    bounding_box: FieldBoundingBox | None = None
     manually_verified: bool
     manually_edited: bool
     candidates: list[FieldCandidate] | None = None
