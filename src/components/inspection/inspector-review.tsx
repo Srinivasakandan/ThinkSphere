@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/common/status-badge";
 import { formatViewType } from "@/lib/format";
-import type { ExtractedField, ProductImage, RuleResult } from "@/types";
+import type { BoundingBox, ExtractedField, ProductImage, RuleResult } from "@/types";
 
 interface InspectorReviewItemProps {
   rule: RuleResult;
   relatedField?: ExtractedField;
   evidenceImage?: ProductImage;
-  onViewEvidence: (imageId: string) => void;
+  onViewEvidence: (imageId: string, boundingBox?: BoundingBox) => void;
   onConfirm: (note?: string) => Promise<void> | void;
   onCorrect: (newValue: string, note?: string) => Promise<void> | void;
 }
@@ -72,7 +72,7 @@ function ReviewItem({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Evidence</p>
             <button
               type="button"
-              onClick={() => onViewEvidence(evidenceImage.id)}
+              onClick={() => onViewEvidence(evidenceImage.id, relatedField?.boundingBox)}
               className="focus-ring mt-0.5 inline-flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <ImageIcon className="h-3.5 w-3.5" /> {formatViewType(evidenceImage.viewType)} Image
@@ -137,7 +137,7 @@ interface InspectorReviewProps {
   rules: RuleResult[];
   fields: ExtractedField[];
   images: ProductImage[];
-  onViewEvidence: (imageId: string) => void;
+  onViewEvidence: (imageId: string, boundingBox?: BoundingBox) => void;
   onConfirm: (ruleId: string, note?: string) => Promise<void> | void;
   onCorrect: (ruleId: string, fieldId: string | undefined, newValue: string, note?: string) => Promise<void> | void;
 }

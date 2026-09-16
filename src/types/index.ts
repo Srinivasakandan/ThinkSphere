@@ -69,6 +69,8 @@ export interface ExtractedField {
   value: string | null;
   confidence: ExtractionConfidence;
   sourceImageId?: string;
+  /** Region on the source image this value was read from, if located. */
+  boundingBox?: BoundingBox;
   validated: boolean;
   manuallyEdited: boolean;
   explanation?: string;

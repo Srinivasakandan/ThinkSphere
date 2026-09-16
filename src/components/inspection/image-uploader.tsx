@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useId, useRef, useState } from "react";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, ScanLine, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { CameraCapture } from "@/components/inspection/camera-capture";
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const MAX_IMAGES = 10;
@@ -16,8 +18,11 @@ interface ImageUploaderProps {
 export function ImageUploader({ currentCount, onFilesSelected, disabled }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const nativeCaptureRef = useRef<HTMLInputElement>(null);
   const inputId = useId();
+  const nativeCaptureId = useId();
 
   const remaining = MAX_IMAGES - currentCount;
 
@@ -107,6 +112,48 @@ export function ImageUploader({ currentCount, onFilesSelected, disabled }: Image
           {error}
         </p>
       )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled || remaining <= 0}
+          onClick={() => setIsCameraOpen(true)}
+        >
+          <ScanLine className="h-3.5 w-3.5" /> Scan with Camera
+        </Button>
+
+        <label
+          htmlFor={nativeCaptureId}
+          className={cn(
+            "focus-ring inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
+            (disabled || remaining <= 0) && "pointer-events-none cursor-not-allowed opacity-60"
+          )}
+        >
+          <Smartphone className="h-3.5 w-3.5" /> Use Device Camera App
+        </label>
+        <input
+          id={nativeCaptureId}
+          ref={nativeCaptureRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          disabled={disabled || remaining <= 0}
+          className="sr-only"
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      <CameraCapture
+        open={isCameraOpen}
+        onOpenChange={setIsCameraOpen}
+        onCapture={(files) => onFilesSelected(files.slice(0, Math.max(remaining, 0)))}
+        remaining={remaining}
+      />
     </div>
   );
 }

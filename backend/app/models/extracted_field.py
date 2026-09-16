@@ -39,6 +39,12 @@ class ExtractedField(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     source_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Pixel region on the source image this value was read from, as
+    # fractions of image width/height ({"x", "y", "width", "height"},
+    # each 0-1) — lets the UI highlight the evidence, not just name the
+    # image. None when it couldn't be located (see app.services.evidence).
+    bounding_box: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     # Populated only when validation_status == CONFLICT: every distinct
     # value detected across images, each with its source, e.g.
     # [{"value": "₹50", "source_image_id": "..."}, ...]. Never

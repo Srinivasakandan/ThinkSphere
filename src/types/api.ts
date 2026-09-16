@@ -130,6 +130,15 @@ export interface ApiFieldCandidate {
   source_image_id: string | null;
 }
 
+/** Normalized (0-1 fraction of image width/height) region on the source
+ * image the value was read from. */
+export interface ApiFieldBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface ApiExtractedFieldResponse {
   id: string;
   inspection_id: string;
@@ -142,6 +151,7 @@ export interface ApiExtractedFieldResponse {
   validation_reason: string | null;
   source_image_id: string | null;
   source_text: string | null;
+  bounding_box: ApiFieldBoundingBox | null;
   manually_verified: boolean;
   manually_edited: boolean;
   candidates: ApiFieldCandidate[] | null;
