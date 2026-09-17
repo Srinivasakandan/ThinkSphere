@@ -4,18 +4,55 @@
 installed — the preferred path for local development per the build
 spec. `MockOCRService` needs no external engine at all and produces
 deterministic, realistic packaged-commodity label text so the full
-extraction/validation/rule pipeline can be exercised in demo mode.
+extraction/validation/rule pipeline can be exercised in demo mode —
+used only when OCR_PROVIDER=mock is set explicitly, a disclosed,
+deliberate developer choice. `UnavailableOCRService` is what OCR_PROVIDER
+=auto (the default) falls back to instead when no real engine is
+installed: it reports "no text detected" rather than ever inventing
+plausible-looking label content, because unlike MockOCRService's caller
+that choice wasn't disclosed or deliberate — fabricated brand names and
+prices presented as real extraction results would be actively dangerous
+in a compliance tool.
 """
 
 import hashlib
 import io
 from dataclasses import dataclass
 
-from app.services.ocr.base import OCRResultData, OCRService
+from app.services.imaging import preprocess_for_ocr
+from app.services.ocr.base import OCRResultData, OCRService, WordBox
+
+
+class TesseractUnavailableError(RuntimeError):
+    """Raised when the tesseract binary itself (not just the pytesseract
+    Python wrapper) cannot be found — distinct from a bad input image."""
+
+
+class UnavailableOCRService(OCRService):
+    """No real OCR engine could be found. Reports zero-confidence, empty
+    text for every image — never invents plausible label content — so
+    the pipeline correctly extracts nothing and routes every requirement
+    to NEEDS_REVIEW rather than presenting fabricated values as findings.
+    """
+
+    async def process_image(
+        self,
+        image_bytes: bytes,
+        *,
+        mime_type: str,
+        original_filename: str,
+        view_type: str,
+    ) -> OCRResultData:
+        return OCRResultData(raw_text="", confidence=0.0, engine_available=False)
 
 
 class TesseractOCRService(OCRService):
-    """Real OCR via the Tesseract engine (python binding: pytesseract)."""
+    """Real OCR via the Tesseract engine (python binding: pytesseract).
+
+    Images are first run through OpenCV preprocessing (auto-rotate,
+    deskew, contrast enhancement — app.services.imaging) so OCR reads
+    the label as photographed, not a raw, possibly tilted capture.
+    """
 
     async def process_image(
         self,
@@ -31,22 +68,62 @@ class TesseractOCRService(OCRService):
         except ImportError:
             return OCRResultData(raw_text="", confidence=0.0)
 
+        preprocessed = preprocess_for_ocr(image_bytes, mime_type)
+
         try:
-            image = Image.open(io.BytesIO(image_bytes))
+            image = Image.open(io.BytesIO(preprocessed))
             image.load()
         except Exception:
             # Not a readable image — surface as a zero-confidence result
             # rather than raising, so processing can route to NEEDS_REVIEW.
             return OCRResultData(raw_text="", confidence=0.0)
 
-        data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-        words = [w for w in data.get("text", []) if w.strip()]
-        raw_text = " ".join(words)
+        try:
+            data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        except pytesseract.TesseractNotFoundError as exc:
+            raise TesseractUnavailableError(
+                "The tesseract-ocr binary is not installed or not on PATH."
+            ) from exc
 
-        confidences = [float(c) for c in data.get("conf", []) if c not in ("-1", -1)]
+        raw_parts: list[str] = []
+        words: list[WordBox] = []
+        confidences: list[float] = []
+        cursor = 0
+        n = len(data.get("text", []))
+        for i in range(n):
+            text = data["text"][i].strip()
+            if not text:
+                continue
+            if raw_parts:
+                cursor += 1  # the joining space added below
+            start = cursor
+            raw_parts.append(text)
+            cursor += len(text)
+            words.append(
+                WordBox(
+                    text=text,
+                    start_char=start,
+                    end_char=cursor,
+                    left=int(data["left"][i]),
+                    top=int(data["top"][i]),
+                    width=int(data["width"][i]),
+                    height=int(data["height"][i]),
+                )
+            )
+            conf = data.get("conf", [])[i] if i < len(data.get("conf", [])) else -1
+            if conf not in ("-1", -1):
+                confidences.append(float(conf))
+
+        raw_text = " ".join(raw_parts)
         avg_conf = (sum(confidences) / len(confidences) / 100.0) if confidences else 0.0
 
-        return OCRResultData(raw_text=raw_text, confidence=max(0.0, min(1.0, avg_conf)))
+        return OCRResultData(
+            raw_text=raw_text,
+            confidence=max(0.0, min(1.0, avg_conf)),
+            words=words,
+            image_width=image.width,
+            image_height=image.height,
+        )
 
 
 @dataclass

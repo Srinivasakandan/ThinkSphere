@@ -17,8 +17,15 @@ below).
 - SQLAlchemy 2.x + Alembic, PostgreSQL (via `psycopg` v3)
 - Supabase Auth (JWT verification) and Supabase Storage — both optional;
   see **Mock mode**
-- Tesseract OCR (optional, open-source) via `pytesseract`, with a
-  deterministic mock OCR engine as the default
+- Tesseract OCR (open-source) via `pytesseract`, used automatically
+  when installed (`OCR_PROVIDER=auto`, the default). When it isn't
+  installed, the API reports "no text detected" for every image rather
+  than ever fabricating plausible label content — the deterministic
+  mock OCR engine that does generate realistic demo text only runs
+  under the explicit, disclosed `OCR_PROVIDER=mock`
+- OpenCV (`opencv-python-headless`) preprocesses every image — EXIF
+  auto-rotate, deskew, contrast enhancement — before OCR runs
+  (`app/services/imaging/`)
 - ReportLab for PDF report generation
 - Pytest + FastAPI `TestClient` for tests; Ruff, Black, MyPy for quality
 
@@ -105,7 +112,7 @@ See `.env.example`. Nothing is required to run in **mock mode**:
 | `FRONTEND_URL` | Allowed CORS origin |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` | Leave blank for mock auth |
 | `SUPABASE_STORAGE_BUCKET` | Bucket name once Supabase Storage is configured |
-| `OCR_PROVIDER` | `mock` (default) or `tesseract` |
+| `OCR_PROVIDER` | `auto` (default, real Tesseract when installed else mock), `tesseract`, or `mock` |
 | `LOCAL_STORAGE_DIR` | Filesystem fallback used when Supabase Storage isn't configured |
 | `API_ENV` | `development` or `production` |
 | `ALLOW_MOCK_AUTH` | Whether unauthenticated requests fall back to a demo inspector (never enable in production) |
@@ -192,11 +199,21 @@ works with zero external services configured:
 - **Storage**: no `SUPABASE_SERVICE_ROLE_KEY` → images/reports are
   written to `LOCAL_STORAGE_DIR` and served back at `/media/...`
   (`app/services/storage/`).
-- **OCR**: `OCR_PROVIDER=mock` (default) → a deterministic engine
-  (`app/services/ocr/local_ocr.py`) generates realistic packaged-label
-  text keyed by image filename, so processing is reproducible without
-  Tesseract installed. Set `OCR_PROVIDER=tesseract` to use real OCR
-  (the Tesseract binary is installed in the Docker image).
+- **OCR**: `OCR_PROVIDER=auto` (default) → real Tesseract OCR
+  (`app/services/ocr/local_ocr.py`, behind OpenCV preprocessing in
+  `app/services/imaging/`) when the `tesseract-ocr` binary is on PATH
+  (it is in the Docker image; install with `apt-get install
+  tesseract-ocr` locally). When it isn't, `UnavailableOCRService`
+  reports zero-confidence, empty text for every image — extraction
+  finds nothing and every requirement correctly routes to
+  `NEEDS_REVIEW` — rather than ever presenting fabricated label content
+  as a real result. Set `OCR_PROVIDER=tesseract` to require real OCR
+  (fails loudly if missing), or `OCR_PROVIDER=mock` to explicitly opt
+  into `MockOCRService`'s deterministic demo text (keyed by image
+  filename, so a given demo image always produces the same result) —
+  useful for exercising the UI without Tesseract installed, but never
+  the default, since an unnoticed missing install must never look
+  identical to a working extraction pipeline.
 - **Rules**: the seed script's rules are explicitly `is_demo=True` with
   a `legal_source` that says so — replace them with verified Legal
   Metrology rule text before any production use; nothing in application

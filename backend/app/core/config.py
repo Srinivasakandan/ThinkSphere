@@ -29,11 +29,24 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
     supabase_storage_bucket: str = "inspection-images"
 
-    # OCR provider selection. "mock" requires no external engine/model.
-    ocr_provider: str = "mock"
+    # OCR provider selection: "auto" (default) uses real Tesseract OCR
+    # when the tesseract-ocr binary is installed and transparently falls
+    # back to deterministic mock text otherwise, so the same deployment
+    # works in a demo sandbox and in production. Force "tesseract" or
+    # "mock" to pin one explicitly.
+    ocr_provider: str = "auto"
 
     # Local filesystem fallback for storage when Supabase is not configured.
     local_storage_dir: str = "./storage_mock"
+
+    # This API's own publicly-reachable base URL (e.g.
+    # https://api.example.com or http://localhost:8000). Required
+    # whenever the frontend runs on a different origin than this API —
+    # without it, local-storage image/report URLs are returned as a bare
+    # "/media/..." path, which resolves against the *frontend's* origin
+    # in the browser and 404s. Leave blank only when frontend and API
+    # share an origin (e.g. reverse-proxied under one host).
+    backend_public_url: str = ""
 
     # Auth: when true, unauthenticated requests are treated as a demo
     # inspector. Only ever enabled outside production.

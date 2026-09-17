@@ -84,6 +84,7 @@ export function mapExtractedField(f: ApiExtractedFieldResponse): ExtractedField 
     value: f.value,
     confidence: f.confidence_level,
     sourceImageId: f.source_image_id ?? undefined,
+    boundingBox: f.bounding_box ?? undefined,
     validated: f.manually_verified || f.validation_status === "VALID",
     manuallyEdited: f.manually_edited,
     explanation: f.validation_reason ?? undefined,

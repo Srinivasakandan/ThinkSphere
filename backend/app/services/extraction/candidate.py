@@ -5,6 +5,8 @@ conflict-resolution/orchestration step in extractor.py.
 import uuid
 from dataclasses import dataclass, field
 
+from app.services.ocr.base import WordBox
+
 
 @dataclass
 class ExtractionCandidate:
@@ -23,6 +25,9 @@ class ImageOCRInput:
     raw_text: str
     ocr_confidence: float
     view_type: str
+    words: list[WordBox] = field(default_factory=list)
+    image_width: int = 0
+    image_height: int = 0
 
 
 @dataclass

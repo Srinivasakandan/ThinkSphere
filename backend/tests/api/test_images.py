@@ -41,6 +41,23 @@ def test_upload_and_delete_image(client):
     assert all(img["id"] != image_id for img in detail["images"])
 
 
+def test_blurry_image_flagged_poor_quality_immediately_at_upload(client):
+    """make_png_bytes is a flat solid-color image — no edges at all, the
+    blur check's worst case — so uploading it should surface POOR quality
+    and a manual-inspection-style note right away, before OCR/processing
+    ever runs (spec: blur/quality checked at upload time)."""
+    inspection_id = _create_inspection(client)
+    files = [("files", ("front.png", make_png_bytes(), "image/png"))]
+    upload_response = client.post(
+        f"/api/v1/inspections/{inspection_id}/images", files=files, data={"view_types": ["FRONT"]}
+    )
+    assert upload_response.status_code == 200
+    image = upload_response.json()[0]
+    assert image["image_quality"] == "POOR"
+    assert image["quality_note"]
+    assert "manual inspection" in image["quality_note"].lower()
+
+
 def test_delete_nonexistent_image_returns_404(client):
     inspection_id = _create_inspection(client)
     response = client.delete(

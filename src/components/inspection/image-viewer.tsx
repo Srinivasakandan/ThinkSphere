@@ -12,12 +12,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatViewType } from "@/lib/format";
-import type { ProductImage } from "@/types";
+import type { BoundingBox, ProductImage } from "@/types";
 
 interface ImageViewerProps {
   images: ProductImage[];
   openImageId: string | null;
   onOpenChange: (imageId: string | null) => void;
+  /** Highlights the region on the currently-open image a value/finding
+   * was read from — cleared automatically when the open image changes. */
+  highlightBox?: BoundingBox;
 }
 
 const QUALITY_LABEL: Record<string, string> = {
@@ -26,7 +29,7 @@ const QUALITY_LABEL: Record<string, string> = {
   POOR: "Poor",
 };
 
-export function ImageViewer({ images, openImageId, onOpenChange }: ImageViewerProps) {
+export function ImageViewer({ images, openImageId, onOpenChange, highlightBox }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
 
@@ -126,19 +129,35 @@ export function ImageViewer({ images, openImageId, onOpenChange }: ImageViewerPr
                   </Button>
                 )}
                 <div className="relative max-h-[75vh] max-w-full overflow-auto">
-                  {/* Bounding box overlays for detected fields would render here in a
-                      relatively-positioned wrapper once the backend supplies coordinates. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image.url}
-                    alt={`${formatViewType(image.viewType)} view of the product`}
+                  {/* This inner box carries the zoom/rotate transform so the
+                      highlight overlay stays pinned to the image beneath it. */}
+                  <div
+                    className="relative inline-block"
                     style={{
                       transform: `scale(${zoom}) rotate(${rotation}deg)`,
                       transition: "transform 150ms ease",
                     }}
-                    className="max-h-[75vh] w-auto select-none rounded"
-                    draggable={false}
-                  />
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.url}
+                      alt={`${formatViewType(image.viewType)} view of the product`}
+                      className="block max-h-[75vh] w-auto select-none rounded"
+                      draggable={false}
+                    />
+                    {highlightBox && (
+                      <div
+                        className="pointer-events-none absolute rounded-sm border-2 border-primary bg-primary/15"
+                        style={{
+                          left: `${highlightBox.x * 100}%`,
+                          top: `${highlightBox.y * 100}%`,
+                          width: `${highlightBox.width * 100}%`,
+                          height: `${highlightBox.height * 100}%`,
+                        }}
+                        aria-label="Detected region for this value"
+                      />
+                    )}
+                  </div>
                 </div>
                 {images.length > 1 && (
                   <Button

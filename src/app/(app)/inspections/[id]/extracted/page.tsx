@@ -7,13 +7,14 @@ import { usePageHeader } from "@/components/layout/page-header-context";
 import { InspectionStepper } from "@/components/inspection/inspection-stepper";
 import { ExtractedFieldCard } from "@/components/inspection/extracted-field-card";
 import { ImageViewer } from "@/components/inspection/image-viewer";
+import { ManualInspectionBanner } from "@/components/inspection/manual-inspection-banner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/common/error-state";
 import { InspectionDetailSkeleton } from "@/components/common/skeletons";
 import { formatViewType } from "@/lib/format";
 import { getInspection, updateExtractedField } from "@/lib/api/inspections";
-import type { Inspection } from "@/types";
+import type { BoundingBox, Inspection } from "@/types";
 
 const QUALITY_STYLES: Record<string, string> = {
   GOOD: "bg-status-pass-bg text-status-pass border-status-pass-border",
@@ -32,6 +33,7 @@ export default function ExtractedInformationPage({ params }: { params: Promise<{
   const router = useRouter();
   const [inspection, setInspection] = useState<Inspection | null | undefined>(undefined);
   const [viewerImageId, setViewerImageId] = useState<string | null>(null);
+  const [viewerHighlight, setViewerHighlight] = useState<BoundingBox | undefined>(undefined);
 
   useEffect(() => {
     getInspection(id).then((res) => setInspection(res ?? null));
@@ -74,6 +76,11 @@ export default function ExtractedInformationPage({ params }: { params: Promise<{
         </CardContent>
       </Card>
 
+      <ManualInspectionBanner
+        poorCount={inspection.images.filter((img) => img.quality === "POOR").length}
+        totalCount={inspection.images.length}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle>Source Images</CardTitle>
@@ -88,7 +95,10 @@ export default function ExtractedInformationPage({ params }: { params: Promise<{
               <button
                 key={img.id}
                 type="button"
-                onClick={() => setViewerImageId(img.id)}
+                onClick={() => {
+                  setViewerHighlight(undefined);
+                  setViewerImageId(img.id);
+                }}
                 className="focus-ring group relative h-24 w-20 shrink-0 overflow-hidden rounded-md border border-border"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -132,7 +142,10 @@ export default function ExtractedInformationPage({ params }: { params: Promise<{
               field={field}
               sourceImage={inspection.images.find((i) => i.id === field.sourceImageId)}
               onSave={(value) => handleFieldSave(field.id, value)}
-              onViewSource={setViewerImageId}
+              onViewSource={(imageId) => {
+                setViewerHighlight(field.boundingBox);
+                setViewerImageId(imageId);
+              }}
             />
           ))}
         </CardContent>
@@ -147,7 +160,18 @@ export default function ExtractedInformationPage({ params }: { params: Promise<{
         </Button>
       </div>
 
-      <ImageViewer images={inspection.images} openImageId={viewerImageId} onOpenChange={setViewerImageId} />
+      <ImageViewer
+        images={inspection.images}
+        openImageId={viewerImageId}
+        onOpenChange={(imageId) => {
+          // Clears whenever the open image changes (including carousel
+          // prev/next) — the highlight is only meaningful for the image it
+          // was opened for, and is re-set explicitly by "View Source".
+          setViewerImageId(imageId);
+          setViewerHighlight(undefined);
+        }}
+        highlightBox={viewerHighlight}
+      />
     </div>
   );
 }

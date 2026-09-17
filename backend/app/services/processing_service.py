@@ -23,8 +23,10 @@ from app.models.inspection import Inspection
 from app.models.ocr_result import OCRResult
 from app.repositories import inspection_repository, result_repository
 from app.schemas.inspection import ProcessingPipelineStage, ProcessingStatusResponse
+from app.services.evidence import locate_bounding_box
 from app.services.extraction.candidate import ImageOCRInput
 from app.services.extraction.extractor import extract_product_information
+from app.services.imaging import POOR_IMAGE_QUALITY_NOTE
 from app.services.ocr import OCRService
 from app.services.rules.context import FieldSnapshot, RuleEvaluationInput
 from app.services.rules.rule_engine import evaluate_all
@@ -37,9 +39,18 @@ POOR_QUALITY_THRESHOLD = 0.5
 FAIR_QUALITY_THRESHOLD = 0.8
 UNRELIABLE_POOR_FRACTION = 0.5
 
+OCR_UNAVAILABLE_NOTE = (
+    "No OCR engine is available on this server, so this image could not be read at all. "
+    "This is a deployment issue, not a problem with the photo — every declaration for this "
+    "item requires manual entry until the OCR engine is installed."
+)
+
 
 class ProcessingError(RuntimeError):
     pass
+
+
+_QUALITY_RANK = {ImageQuality.POOR.value: 0, ImageQuality.FAIR.value: 1, ImageQuality.GOOD.value: 2}
 
 
 def _quality_for_confidence(confidence: float) -> str:
@@ -48,6 +59,16 @@ def _quality_for_confidence(confidence: float) -> str:
     if confidence >= POOR_QUALITY_THRESHOLD:
         return ImageQuality.FAIR.value
     return ImageQuality.POOR.value
+
+
+def _worse_quality(a: str, b: str) -> str:
+    # UNKNOWN (no prior signal, e.g. blur check unavailable) never wins
+    # over an actual grade in either direction.
+    if a not in _QUALITY_RANK:
+        return b
+    if b not in _QUALITY_RANK:
+        return a
+    return a if _QUALITY_RANK[a] <= _QUALITY_RANK[b] else b
 
 
 async def run_processing(
@@ -124,12 +145,23 @@ async def run_processing(
                     ocr_confidence=ocr_result_data.confidence,
                 )
             )
-            image.image_quality = _quality_for_confidence(ocr_result_data.confidence)
-            image.quality_note = (
-                "Image may be difficult to read. Consider retaking this image."
-                if image.image_quality == ImageQuality.POOR.value
-                else None
-            )
+            # Combine with whatever quality signal was already set at
+            # upload time (the blur check in image_service.upload_images)
+            # — a real "this photo is blurry" finding is never silently
+            # overwritten by a decent OCR confidence score, and vice
+            # versa: the worse of the two grades wins.
+            ocr_quality = _quality_for_confidence(ocr_result_data.confidence)
+            image.image_quality = _worse_quality(image.image_quality, ocr_quality)
+            if not ocr_result_data.engine_available:
+                # Distinct from "this photo is blurry" — the photo itself
+                # was never evaluated at all, so retaking it won't help;
+                # this is a deployment issue, not something the image
+                # capture can fix.
+                image.quality_note = OCR_UNAVAILABLE_NOTE
+            elif image.image_quality == ImageQuality.POOR.value:
+                image.quality_note = POOR_IMAGE_QUALITY_NOTE
+            else:
+                image.quality_note = None
             image.processing_status = "PROCESSED"
 
             ocr_inputs.append(
@@ -138,6 +170,9 @@ async def run_processing(
                     raw_text=ocr_result_data.raw_text,
                     ocr_confidence=ocr_result_data.confidence,
                     view_type=image.view_type,
+                    words=ocr_result_data.words,
+                    image_width=ocr_result_data.image_width,
+                    image_height=ocr_result_data.image_height,
                 )
             )
 
@@ -162,9 +197,22 @@ async def run_processing(
         db.commit()
 
         # --- Validation ----------------------------------------------------
+        ocr_inputs_by_image = {inp.image_id: inp for inp in ocr_inputs}
         field_rows = []
         for result in extraction_results:
             outcome = validate_field(result)
+            source_ocr = ocr_inputs_by_image.get(result.source_image_id) if result.source_image_id else None
+            bounding_box = (
+                locate_bounding_box(
+                    words=source_ocr.words,
+                    raw_text=source_ocr.raw_text,
+                    source_text=result.source_text,
+                    image_width=source_ocr.image_width,
+                    image_height=source_ocr.image_height,
+                )
+                if source_ocr
+                else None
+            )
             field_rows.append(
                 {
                     "field_name": result.field_name,
@@ -176,6 +224,7 @@ async def run_processing(
                     "validation_reason": outcome.reason,
                     "source_image_id": result.source_image_id,
                     "source_text": result.source_text,
+                    "bounding_box": bounding_box,
                     "manually_verified": False,
                     "manually_edited": False,
                     "candidates": (

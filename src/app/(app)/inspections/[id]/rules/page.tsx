@@ -14,7 +14,7 @@ import { ErrorState } from "@/components/common/error-state";
 import { InspectionDetailSkeleton } from "@/components/common/skeletons";
 import { getInspection, reviewRule } from "@/lib/api/inspections";
 import { summarizeRuleResults } from "@/lib/inspection/status";
-import type { Inspection, RuleResult } from "@/types";
+import type { BoundingBox, Inspection, RuleResult } from "@/types";
 
 export default function RuleEvaluationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -28,6 +28,7 @@ export default function RuleEvaluationPage({ params }: { params: Promise<{ id: s
   const [inspection, setInspection] = useState<Inspection | null | undefined>(undefined);
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
   const [viewerImageId, setViewerImageId] = useState<string | null>(null);
+  const [viewerHighlight, setViewerHighlight] = useState<BoundingBox | undefined>(undefined);
 
   useEffect(() => {
     getInspection(id).then((res) => setInspection(res ?? null));
@@ -120,10 +121,24 @@ export default function RuleEvaluationPage({ params }: { params: Promise<{ id: s
         rule={selectedRule}
         images={inspection.images}
         onOpenChange={(open) => !open && setSelectedRuleId(null)}
-        onViewEvidence={setViewerImageId}
+        onViewEvidence={(imageId) => {
+          const field = inspection.extractedFields.find(
+            (f) => f.field === selectedRule?.field && f.sourceImageId === imageId
+          );
+          setViewerHighlight(field?.boundingBox);
+          setViewerImageId(imageId);
+        }}
         onMarkReviewed={handleMarkReviewed}
       />
-      <ImageViewer images={inspection.images} openImageId={viewerImageId} onOpenChange={setViewerImageId} />
+      <ImageViewer
+        images={inspection.images}
+        openImageId={viewerImageId}
+        onOpenChange={(imageId) => {
+          setViewerImageId(imageId);
+          setViewerHighlight(undefined);
+        }}
+        highlightBox={viewerHighlight}
+      />
     </div>
   );
 }
